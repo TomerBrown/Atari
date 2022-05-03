@@ -125,6 +125,9 @@ def dqn_learing(
     ######
 
     # YOUR CODE HERE
+    print(env.observation_space)
+    print(q_func)
+    Q = q_func()#(env.observation_space, env.action_space.n)
 
     ######
 
@@ -181,6 +184,13 @@ def dqn_learing(
         #####
 
         # YOUR CODE HERE
+        pred = Q(last_obs)
+        
+        obs, reward, done, info = env.step(action)
+        if done:
+            obs = env.reset()
+
+        
 
         #####
 
@@ -219,6 +229,7 @@ def dqn_learing(
             #####
 
             # YOUR CODE HERE
+            pass
 
             #####
 
