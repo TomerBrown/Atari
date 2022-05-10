@@ -125,9 +125,11 @@ def dqn_learing(
     ######
 
     # YOUR CODE HERE
-    print(env.observation_space)
-    print(q_func)
-    Q = q_func()#(env.observation_space, env.action_space.n)
+    Q = q_func(num_actions=6)
+    target_Q = q_func(num_actions=6)
+    if torch.cuda.is_available():
+        Q.cuda()
+        target_Q.cuda()
 
     ######
 
@@ -184,13 +186,17 @@ def dqn_learing(
         #####
 
         # YOUR CODE HERE
-        pred = Q(last_obs)
         
+        obs_idx = replay_buffer.store_frame(last_obs)
+        encoded_obs = replay_buffer.encode_recent_observation()
+        
+        action = select_epilson_greedy_action(Q, encoded_obs, t)
         obs, reward, done, info = env.step(action)
         if done:
             obs = env.reset()
-
         
+        last_obs = obs
+        replay_buffer.store_effect(obs_idx, action, reward, done)
 
         #####
 
@@ -229,7 +235,45 @@ def dqn_learing(
             #####
 
             # YOUR CODE HERE
-            pass
+            obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
+
+            # Create as tensors:
+            obs_batch = torch.from_numpy(obs_batch)
+            act_batch = torch.from_numpy(act_batch)
+            rew_batch = torch.from_numpy(rew_batch)
+            next_obs_batch = torch.from_numpy(next_obs_batch)
+            done_mask = torch.from_numpy(done_mask)
+            
+            # If GPU is available, move to GPU
+            if torch.cuda.is_available():
+                obs_batch = obs_batch.cuda(non_blocking=True).float()
+                act_batch = act_batch.cuda(non_blocking=True).long()
+                rew_batch = rew_batch.cuda(non_blocking=True).float()
+                next_obs_batch = next_obs_batch.cuda(non_blocking=True).float()
+                done_mask = done_mask.cuda(non_blocking=True)
+            
+            V_a = torch.max(target_Q(next_obs_batch), dim=1).values
+            V_a[done_mask == 1] = 0
+            
+            current = Q(obs_batch)
+            print(current.shape)
+            print(act_batch.shape)
+            print(act_batch)
+            print(rew_batch.shape)
+            print(V_a.shape)
+            print(act_batch.unsqueeze(1))
+            bellman_err = (rew_batch + gamma * V_a) - current.gather(1, act_batch.unsqueeze(1))
+            d_error = torch.clip(bellman_err, -1, 1)
+
+            optimizer.zero_grad()
+            current.backward(d_error.data.unsqueeze(1))
+            optimizer.step()
+
+            if (t % target_update_freq) == 0:
+                target_Q.load_state_dict(Q.state_dict())
+                for param in target_Q.parameters():
+                    param.requires_grad_ = False
+                target_Q.eval()
 
             #####
 
