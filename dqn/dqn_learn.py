@@ -126,7 +126,19 @@ def dqn_learing(
 
     # YOUR CODE HERE
     Q = q_func(num_actions=6)
+    
     target_Q = q_func(num_actions=6)
+    target_Q.load_state_dict(Q.state_dict())
+    target_Q.eval()
+    # w_bar = Q.state_dict()
+    # w = {}
+    # for p in w_bar:
+    #     w[p] = w_bar[p].clone().detach()
+    # target_Q.load_state_dict(w)
+    # for param in target_Q.parameters():
+    #     param.requires_grad_ = False
+    # target_Q.eval()
+
     if torch.cuda.is_available():
         Q.cuda()
         target_Q.cuda()
@@ -143,7 +155,7 @@ def dqn_learing(
     ###############
     # RUN ENV     #
     ###############
-    num_param_updates = 0
+    num_param_updates = 100
     mean_episode_reward = -float('nan')
     best_mean_episode_reward = -float('inf')
     last_obs = env.reset()
@@ -235,6 +247,26 @@ def dqn_learing(
             #####
 
             # YOUR CODE HERE
+
+            # if (t % target_update_freq) == 0:
+            #     target_Q.load_state_dict(Q.state_dict())
+            #     for param in target_Q.parameters():
+            #         # param.requires_grad_ = False
+            #         pass
+            #     # target_Q.eval()
+
+            if (((t % target_update_freq) == 0) and (num_param_updates > 0)):
+                num_param_updates -= 1
+                target_Q.load_state_dict(Q.state_dict())
+                # w = Q.state_dict()
+                # w_bar = {}
+                # for p in w:
+                #     w_bar[p] = w[p].clone().detach()
+                # target_Q.load_state_dict(w_bar)
+                # for param in target_Q.parameters():
+                #     param.requires_grad_ = False
+                # target_Q.eval()
+
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 
             # Create as tensors:
@@ -254,26 +286,16 @@ def dqn_learing(
             
             V_a = torch.max(target_Q(next_obs_batch), dim=1).values
             V_a[done_mask == 1] = 0
+            V_a = V_a.detach().unsqueeze(1)
             
             current = Q(obs_batch)
-            print(current.shape)
-            print(act_batch.shape)
-            print(act_batch)
-            print(rew_batch.shape)
-            print(V_a.shape)
-            print(act_batch.unsqueeze(1))
-            bellman_err = (rew_batch + gamma * V_a) - current.gather(1, act_batch.unsqueeze(1))
-            d_error = torch.clip(bellman_err, -1, 1)
+            bellman_err = torch.nn.functional.mse_loss(current.gather(1, act_batch.unsqueeze(1)), rew_batch + gamma * V_a)
 
             optimizer.zero_grad()
-            current.backward(d_error.data.unsqueeze(1))
+            bellman_err.backward()
+            for param in Q.parameters():
+                param.grad.data.clamp_(-1, 1)
             optimizer.step()
-
-            if (t % target_update_freq) == 0:
-                target_Q.load_state_dict(Q.state_dict())
-                for param in target_Q.parameters():
-                    param.requires_grad_ = False
-                target_Q.eval()
 
             #####
 
