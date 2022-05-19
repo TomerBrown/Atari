@@ -5,6 +5,7 @@ from dqn_model import DQN
 from dqn_learn import OptimizerSpec, dqn_learing
 from utils.gym import get_env, get_wrapper_by_name
 from utils.schedule import LinearSchedule
+from argparse import ArgumentParser
 
 BATCH_SIZE = 32
 GAMMA = 0.99
@@ -17,8 +18,14 @@ LEARNING_RATE = 0.00025
 ALPHA = 0.95
 EPS = 0.01
 
-def main(env, num_timesteps):
+def get_args():
+    parser = ArgumentParser()
+    parser.add_argument('--run_name', type=str, default='unnamed', help='Run name (appears in output file)')
+    parser.add_argument('--action_selection', type=str, default='epsilon greedy', help='epsilon greedy / softmax')
+    return parser.parse_args()
 
+def main(env, num_timesteps, args):
+    
     def stopping_criterion(env):
         # notice that here t is the number of steps of the wrapped env,
         # which is different from the number of steps in the underlying env
@@ -44,9 +51,13 @@ def main(env, num_timesteps):
         learning_freq=LEARNING_FREQ,
         frame_history_len=FRAME_HISTORY_LEN,
         target_update_freq=TARGER_UPDATE_FREQ,
+        selection_method=args.action_selection, 
+        run_name=args.run_name,
     )
 
 if __name__ == '__main__':
+    args = get_args()
+    print(args)
     # Get Atari games.
     benchmark = gym.benchmark_spec('Atari40M')
 
@@ -55,6 +66,6 @@ if __name__ == '__main__':
 
     # Run training
     seed = 0 # Use a seed of zero (you may want to randomize the seed!)
-    env = get_env(task, seed)
+    env = get_env(task, seed, args.run_name)
 
-    main(env, task.max_timesteps)
+    main(env, task.max_timesteps, args)

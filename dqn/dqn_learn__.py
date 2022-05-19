@@ -17,7 +17,7 @@ import torch.autograd as autograd
 from utils.replay_buffer import ReplayBuffer
 from utils.gym import get_wrapper_by_name
 
-USE_CUDA = False#torch.cuda.is_available()
+USE_CUDA = torch.cuda.is_available()
 dtype = torch.cuda.FloatTensor if USE_CUDA else torch.FloatTensor
 
 class Variable(autograd.Variable):
@@ -51,8 +51,6 @@ def dqn_learing(
     learning_freq=4,
     frame_history_len=4,
     target_update_freq=10000,
-    selection_method: str = 'epsilon greedy',
-    run_name: str = 'unnamed'
     ):
 
     """Run Deep Q-learning algorithm.
@@ -111,14 +109,6 @@ def dqn_learing(
         input_arg = frame_history_len * img_c
     num_actions = env.action_space.n
     
-    def select_softmax_action(model, obs, t):
-        with torch.no_grad():
-            obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
-            Q_approx = model(Variable(obs, volatile=True)).data
-            probs = F.softmax(Q_approx, dim=1)
-            actions = torch.multinomial(probs, 1).cpu()
-            return actions
-    
     # Construct an epilson greedy policy with given exploration schedule
     def select_epilson_greedy_action(model, obs, t):
         sample = random.random()
@@ -130,12 +120,6 @@ def dqn_learing(
                 return model(Variable(obs, volatile=True)).data.max(1)[1].cpu()
         else:
             return torch.IntTensor([[random.randrange(num_actions)]])
-
-    def select_action(model, obs, t):
-        if selection_method == 'epsilon greedy':
-            return select_epilson_greedy_action(model, obs, t)
-        elif selection_method == 'softmax':
-            return select_softmax_action(model, obs, t)
 
     # Initialize target q function and q function, i.e. build the model.
     ######
@@ -218,7 +202,7 @@ def dqn_learing(
         obs_idx = replay_buffer.store_frame(last_obs)
         encoded_obs = replay_buffer.encode_recent_observation()
         
-        action = select_action(Q, encoded_obs, t)
+        action = select_epilson_greedy_action(Q, encoded_obs, t)
         obs, reward, done, info = env.step(action)
         
         replay_buffer.store_effect(obs_idx, action, reward, done)
@@ -332,6 +316,6 @@ def dqn_learing(
             sys.stdout.flush()
 
             # Dump statistics to pickle
-            with open(f'{run_name}_statistics.pkl', 'wb') as f:
+            with open('statistics.pkl', 'wb') as f:
                 pickle.dump(Statistic, f)
                 print("Saved to %s" % 'statistics.pkl')

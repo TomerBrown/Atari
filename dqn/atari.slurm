@@ -1,7 +1,7 @@
 #! /bin/sh
-#SBATCH --job-name=atari
-#SBATCH --output=atari.out
-#SBATCH --error=atari.err
+#SBATCH --job-name=atari_default
+#SBATCH --output=atari_default.out
+#SBATCH --error=atari_default.err
 #SBATCH --partition=studentbatch
 #SBATCH --time=1440
 #SBATCH --nodes=1
