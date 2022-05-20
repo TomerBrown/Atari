@@ -17,7 +17,7 @@ import torch.autograd as autograd
 from utils.replay_buffer import ReplayBuffer
 from utils.gym import get_wrapper_by_name
 
-USE_CUDA = False#torch.cuda.is_available()
+USE_CUDA = torch.cuda.is_available()
 dtype = torch.cuda.FloatTensor if USE_CUDA else torch.FloatTensor
 
 class Variable(autograd.Variable):
@@ -115,7 +115,11 @@ def dqn_learing(
         with torch.no_grad():
             obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
             Q_approx = model(Variable(obs, volatile=True)).data
-            probs = F.softmax(Q_approx, dim=1)
+            beta_t = torch.max(torch.log(torch.tensor(t)), torch.tensor(0))
+            if USE_CUDA:
+                beta_t = beta_t.cuda(non_blocking=True)
+            weighted_Q_approx = Q_approx * beta_t
+            probs = F.softmax(weighted_Q_approx, dim=1)
             actions = torch.multinomial(probs, 1).cpu()
             return actions
     
