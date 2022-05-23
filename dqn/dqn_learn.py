@@ -52,7 +52,9 @@ def dqn_learing(
     frame_history_len=4,
     target_update_freq=10000,
     selection_method: str = 'epsilon greedy',
-    run_name: str = 'unnamed'
+    run_name: str = 'unnamed',
+    beta_func: str = 'log',
+    beta_pow: float = 0.07,
     ):
 
     """Run Deep Q-learning algorithm.
@@ -115,7 +117,17 @@ def dqn_learing(
         with torch.no_grad():
             obs = torch.from_numpy(obs).type(dtype).unsqueeze(0) / 255.0
             Q_approx = model(Variable(obs, volatile=True)).data
-            beta_t = torch.max(torch.log(torch.tensor(t)), torch.tensor(0))
+            if beta_func == 'log':
+                beta_t = torch.max(torch.log(torch.tensor(t)), torch.tensor(0))
+            elif beta_func == 'loglog':
+                beta_t = torch.max(torch.log(torch.log(torch.tensor(t))), torch.tensor(0))
+            elif beta_func == 'logloglog':
+                beta_t = torch.max(torch.log(torch.log(torch.log(torch.tensor(t)))), torch.tensor(0))
+            elif beta_func == 'root':
+                beta_t = torch.max(torch.tensor(t) ** beta_pow, torch.tensor(0))
+            if torch.isnan(beta_t):
+                beta_t = torch.tensor(0)
+            
             if USE_CUDA:
                 beta_t = beta_t.cuda(non_blocking=True)
             weighted_Q_approx = Q_approx * beta_t
@@ -150,14 +162,6 @@ def dqn_learing(
     target_Q = q_func(input_arg, num_actions)
     target_Q.load_state_dict(Q.state_dict())
     target_Q.eval()
-    # w_bar = Q.state_dict()
-    # w = {}
-    # for p in w_bar:
-    #     w[p] = w_bar[p].clone().detach()
-    # target_Q.load_state_dict(w)
-    # for param in target_Q.parameters():
-    #     param.requires_grad_ = False
-    # target_Q.eval()
 
     if USE_CUDA:
         Q.cuda()
@@ -271,14 +275,6 @@ def dqn_learing(
 
             if (num_param_updates % target_update_freq) == 0:
                 target_Q.load_state_dict(Q.state_dict())
-                # w = Q.state_dict()
-                # w_bar = {}
-                # for p in w:
-                #     w_bar[p] = w[p].clone().detach()
-                # target_Q.load_state_dict(w_bar)
-                # for param in target_Q.parameters():
-                #     param.requires_grad_ = False
-                # target_Q.eval()
 
             obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = replay_buffer.sample(batch_size)
 

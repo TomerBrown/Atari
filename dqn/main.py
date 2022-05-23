@@ -22,6 +22,9 @@ def get_args():
     parser = ArgumentParser()
     parser.add_argument('--run_name', type=str, default='unnamed', help='Run name (appears in output file)')
     parser.add_argument('--action_selection', type=str, default='epsilon greedy', help='epsilon greedy / softmax')
+    parser.add_argument('--beta_func', type=str, default='log', help='loglog / log / root')
+    parser.add_argument('--beta_pow', type=float, default=0.07, help='Power for root beta func')
+    parser.add_argument('--optim', type=str, default=None, help='None for RMSProp, or "Adam" for adam')
     return parser.parse_args()
 
 def main(env, num_timesteps, args):
@@ -35,9 +38,13 @@ def main(env, num_timesteps, args):
         constructor=optim.RMSprop,
         kwargs=dict(lr=LEARNING_RATE, alpha=ALPHA, eps=EPS),
     )
+    if args.optim == 'Adam':
+        optimizer_spec = OptimizerSpec(
+            constructor=optim.Adam,
+            kwargs=dict(lr=1e-5),
+        )
 
     exploration_schedule = LinearSchedule(1000000, 0.1)
-
     dqn_learing(
         env=env,
         q_func=DQN,
@@ -53,6 +60,8 @@ def main(env, num_timesteps, args):
         target_update_freq=TARGER_UPDATE_FREQ,
         selection_method=args.action_selection, 
         run_name=args.run_name,
+        beta_func=args.beta_func,
+        beta_pow=args.beta_pow,
     )
 
 if __name__ == '__main__':
