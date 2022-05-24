@@ -287,16 +287,16 @@ def dqn_learing(
             
             # If GPU is available, move to GPU
             if USE_CUDA:
-                obs_batch = obs_batch.cuda(non_blocking=True).float() / 255.0
+                obs_batch = obs_batch.cuda(non_blocking=True).float() / 255
                 act_batch = act_batch.cuda(non_blocking=True).long()
                 rew_batch = rew_batch.cuda(non_blocking=True).float()
-                next_obs_batch = next_obs_batch.cuda(non_blocking=True).float() / 255.0
+                next_obs_batch = next_obs_batch.cuda(non_blocking=True).float() / 255
                 done_mask = done_mask.cuda(non_blocking=True)
             else:
-                obs_batch = obs_batch.float() / 255.0
+                obs_batch = obs_batch.float() / 255
                 act_batch = act_batch.long()
                 rew_batch = rew_batch.float()
-                next_obs_batch = next_obs_batch.float() / 255.0
+                next_obs_batch = next_obs_batch.float() / 255
             
             V_a = torch.max(target_Q(next_obs_batch), dim=1).values
             V_a = V_a * (1 - done_mask)
@@ -304,8 +304,7 @@ def dqn_learing(
             current = Q(obs_batch).gather(1, act_batch.unsqueeze(1))
 
             bellman_error = rew_batch.unsqueeze(1) + gamma * V_a - current
-            clipped_bellman_error = bellman_error.clamp(-1, 1)
-            d_error = clipped_bellman_error * -1.0
+            d_error = bellman_error.clip(-1, 1) * -1.0
             optimizer.zero_grad()
             current.backward(d_error.data)
             optimizer.step()
